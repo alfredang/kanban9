@@ -2,6 +2,8 @@
 
 An IT project management Kanban board for a fictitious bank's IT PMO, built for demos and training. The whole app is one `index.html` file of vanilla HTML, CSS and JavaScript.
 
+**Live demo:** <https://alfredang.github.io/kanban9/>
+
 ![IT PMO Kanban board with a summary strip, project, assignee and priority filters, and task cards in Backlog, In Progress, Blocked and Done columns, two of them marked Overdue](docs/screenshot.png)
 
 **All tasks, people and projects are sample data.** The board is held in memory, so refreshing the page resets it to the sample tasks.
