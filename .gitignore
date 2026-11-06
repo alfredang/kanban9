@@ -10,6 +10,16 @@
 id_rsa*
 .npmrc
 .netrc
+credentials*
+
+# Databases, dumps and backups
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql
+*.bak
+*.backup
 
 # Local tooling output
 .claude/settings.local.json

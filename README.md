@@ -48,7 +48,10 @@ FormSubmit also needs a one-time activation. The first submission sends a confir
 
 ## Deployment
 
-Each push to `main` deploys the repository root to GitHub Pages through [.github/workflows/pages.yml](.github/workflows/pages.yml). There is no build step.
+The [CI/CD workflow](.github/workflows/pages.yml) has two jobs, and there is no build step:
+
+- **`verify`** runs on pushes to `main` and on pull requests. It checks that `index.html` exists and scans the git history for secrets with Gitleaks.
+- **`deploy`** publishes the repository root to GitHub Pages. It runs only from `main`, and only after `verify` passes.
 
 ## Contributing
 
