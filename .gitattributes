@@ -1,0 +1,2 @@
+# v2's security policy hashes its inline blocks, and CI pins v1's checksum, so line endings must not change.
+index.html text eol=lf

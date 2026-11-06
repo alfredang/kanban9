@@ -1,0 +1,2010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Security policy. GitHub Pages cannot set response headers, so this meta tag carries it.
+  The two hashes must match the inline style and script blocks below. After editing either, run
+  python .github/scripts/check_site.py --write
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-rYdpmLxmO8XKcN2JSywVa680afV5UClvrrVVsUmQRZg='; style-src 'sha256-KjPGN48/pJarnMZXh08TfGNqJ+zEjNbNtX+xWvbzRO8='; img-src data:; connect-src https://formsubmit.co; form-action 'none'; base-uri 'none'; require-trusted-types-for 'script'; trusted-types board-html">
+<meta name="referrer" content="strict-origin">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>IT PMO | Kanban Board v2</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b1d63'/%3E%3Crect x='4' y='3' width='3' height='10' fill='%23ffe36e'/%3E%3Crect x='9' y='3' width='3' height='6' fill='%237fe7ff'/%3E%3C/svg%3E">
+<style>
+  /* ==========================================================================
+     Design tokens: retro blue-screen terminal on the corporate blue palette
+     ========================================================================== */
+  :root {
+    color-scheme: dark;
+
+    --page: #071450;
+    --surface: #0b1d63;      /* chart surface: the chart palette is validated against this */
+    --raised: #102a80;
+    --line: #7fe7ff;
+    --line-soft: #4a68c4;
+    --ink: #f4f7ff;
+    --ink-muted: #b9c9f2;
+    --accent: #ffe36e;
+    --accent-ink: #0b1d63;
+    --bar: #c7d3ea;
+    --bar-ink: #0b1d63;
+    --shadow: #020823;
+
+    /* Chart identity colours, one per status, in fixed column order */
+    --status-backlog: #b58d00;
+    --status-progress: #8578ec;
+    --status-blocked: #df5a3a;
+    --status-done: #0ea5b4;
+
+    --critical: #b3261e;
+    --high: #ffe36e;
+    --medium: #9fd0ff;
+    --low: #c7d3ea;
+    --good: #7be495;
+    --warn: #ffd98a;
+    --bad: #ff9d8c;
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+
+    --font-stack: "Cascadia Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", Menlo, "Liberation Mono", "Courier New", monospace;
+  }
+
+  /* ==========================================================================
+     Base
+     ========================================================================== */
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--font-stack);
+    font-size: 0.9375rem;
+    line-height: 1.45;
+  }
+
+  /* CRT scanlines: decoration only, so it never takes pointer events */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(2, 8, 35, 0.09) 2px 3px);
+    pointer-events: none;
+  }
+
+  h1, h2, h3, p, ul, dl, dd { margin: 0; }
+  ul { padding: 0; list-style: none; }
+  a { color: var(--line); }
+  a:hover { color: var(--accent); }
+
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .skip-link {
+    position: absolute;
+    top: -4rem;
+    left: var(--space-3);
+    z-index: 6;
+    padding: var(--space-2) var(--space-3);
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .skip-link:focus { top: var(--space-2); color: var(--accent-ink); }
+
+  /* Buttons: square corners and a hard shadow that collapses when pressed */
+  .btn {
+    min-height: 2.25rem;
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--ink);
+    background: var(--raised);
+    box-shadow: 3px 3px 0 var(--shadow);
+    font-weight: 700;
+  }
+  .btn:hover { background: var(--line-soft); }
+  .btn:active { box-shadow: none; transform: translate(3px, 3px); }
+
+  .btn--primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .btn--primary:hover { background: var(--ink); }
+  .btn--primary:disabled { background: var(--bar); cursor: progress; }
+
+  /* ==========================================================================
+     Menu bar and summary strip
+     ========================================================================== */
+  .menubar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-2) var(--space-4);
+    background: var(--bar);
+    color: var(--bar-ink);
+    --accent: #0b1d63;
+  }
+
+  .wordmark {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  /* The cursor stops after about five seconds, so nothing blinks indefinitely */
+  .wordmark__cursor { animation: cursor-blink 1.2s steps(2, jump-none) 4; }
+  @keyframes cursor-blink { from { opacity: 1; } to { opacity: 0; } }
+
+  .wordmark__version { font-size: 0.8125rem; font-weight: 400; letter-spacing: 0; }
+
+  .summary {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .summary__item {
+    padding: 0 var(--space-2);
+    border: 1px solid var(--bar-ink);
+    font-size: 0.8125rem;
+  }
+  .summary__value { font-weight: 700; }
+
+  .summary__item--alert {
+    background: var(--critical);
+    border-color: var(--critical);
+    color: #ffffff;
+  }
+
+  .menubar .btn--primary {
+    border-color: var(--bar-ink);
+    background: var(--bar-ink);
+    color: #ffffff;
+    box-shadow: 3px 3px 0 #7d8aa8;
+  }
+  .menubar .btn--primary:hover { background: var(--raised); }
+
+  /* ==========================================================================
+     Page layout, panels and notes
+     ========================================================================== */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+
+  .demo-note { font-size: 0.8125rem; color: var(--ink-muted); }
+
+  .dash > summary {
+    width: fit-content;
+    min-height: 2rem;
+    padding: var(--space-1) var(--space-2);
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .dash__title { display: inline; font-size: 1rem; letter-spacing: 0.06em; }
+  .dash__scope { margin-bottom: var(--space-3); font-size: 0.8125rem; color: var(--ink-muted); }
+
+  .charts {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1.35fr);
+    gap: var(--space-4) var(--space-3);
+    align-items: stretch;
+    padding-top: var(--space-2);
+  }
+
+  .panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-4) var(--space-3) var(--space-3);
+    border: 3px double var(--line);
+    background: var(--surface);
+    box-shadow: 4px 4px 0 var(--shadow);
+  }
+
+  .panel__title {
+    position: absolute;
+    top: -0.75em;
+    left: var(--space-3);
+    padding: 0 var(--space-2);
+    background: var(--surface);
+    color: var(--line);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .panel__note { font-size: 0.8125rem; color: var(--ink-muted); }
+
+  /* ==========================================================================
+     Charts
+     ========================================================================== */
+  .chart { display: block; width: 100%; height: auto; max-height: 15rem; }
+  .chart--ring { max-height: 11rem; }
+
+  .chart text { fill: var(--ink); font-family: var(--font-stack); font-size: 14px; }
+  .chart .chart__muted { fill: var(--ink-muted); }
+  .chart .chart__big { font-size: 30px; font-weight: 700; }
+  .chart__grid { stroke: var(--line-soft); stroke-width: 1; }
+  .chart__axis { stroke: var(--ink-muted); stroke-width: 1; }
+  .chart__hit { fill: transparent; }
+  .chart__hit:hover { fill: rgba(255, 227, 110, 0.18); }
+
+  .fill-backlog { fill: var(--status-backlog); }
+  .fill-progress { fill: var(--status-progress); }
+  .fill-blocked { fill: var(--status-blocked); }
+  .fill-done { fill: var(--status-done); }
+  .fill-due { fill: var(--medium); }
+  .fill-overdue { fill: var(--status-blocked); }
+
+  .ring { fill: none; stroke-width: 22; }
+  .ring-empty { stroke: var(--line-soft); }
+  .ring-backlog { stroke: var(--status-backlog); }
+  .ring-progress { stroke: var(--status-progress); }
+  .ring-blocked { stroke: var(--status-blocked); }
+  .ring-done { stroke: var(--status-done); }
+
+  .line-scope, .line-done { fill: none; stroke-width: 2; }
+  .line-scope { stroke: var(--ink-muted); stroke-dasharray: 5 3; }
+  .line-done { stroke: var(--status-done); }
+
+  /* Block progress bar, used by the portfolio, each project and each card */
+  .seg { display: block; width: 100%; height: 0.75rem; }
+  .seg__on { fill: var(--line); }
+  .seg__off { fill: var(--line-soft); }
+
+  .portfolio { display: grid; gap: var(--space-1); }
+  .portfolio__line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 var(--space-3);
+  }
+  .portfolio__pct { font-size: 1.75rem; font-weight: 700; line-height: 1.1; color: var(--accent); }
+
+  .projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-1); }
+
+  .proj {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.125rem var(--space-2);
+    width: 100%;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid transparent;
+    background: none;
+    text-align: left;
+  }
+  .proj:hover { background: var(--raised); }
+  .proj[aria-pressed="true"] { border-color: var(--accent); background: var(--raised); }
+  .proj .seg, .proj__name, .proj__meta { grid-column: 1 / -1; }
+
+  .proj__name { font-weight: 700; font-size: 0.875rem; }
+  .proj__pct { font-weight: 700; font-size: 0.875rem; }
+  .proj__meta { font-size: 0.8125rem; color: var(--ink-muted); }
+  .proj__health { font-size: 0.8125rem; font-weight: 700; white-space: nowrap; justify-self: end; }
+
+  .health--good { color: var(--good); }
+  .health--warn { color: var(--warn); }
+  .health--bad { color: var(--bad); }
+  .health--none { color: var(--ink-muted); }
+
+  .legend { display: grid; gap: var(--space-1); font-size: 0.8125rem; }
+  .legend--inline { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+  .legend__row { display: flex; align-items: center; gap: var(--space-2); }
+  .legend__name { flex: 1 1 auto; }
+  .legend__value { font-weight: 700; white-space: nowrap; }
+  .legend__chip { flex: none; display: block; width: 0.75rem; height: 0.75rem; }
+
+  .data-table summary { min-height: 1.75rem; font-size: 0.8125rem; color: var(--line); cursor: pointer; }
+  .data-table table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+  .data-table th, .data-table td { padding: 0 var(--space-1); border-bottom: 1px solid var(--line-soft); text-align: right; }
+  .data-table th:first-child, .data-table td:first-child { text-align: left; }
+
+  .chart-tip {
+    position: fixed;
+    z-index: 4;
+    max-width: 18rem;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--bar-ink);
+    background: var(--bar);
+    color: var(--bar-ink);
+    box-shadow: 3px 3px 0 var(--shadow);
+    font-size: 0.8125rem;
+    pointer-events: none;
+  }
+
+  /* ==========================================================================
+     Filter bar
+     ========================================================================== */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--line-soft);
+    background: var(--surface);
+  }
+
+  .filters__field {
+    display: flex;
+    flex: 1 1 11rem;
+    flex-direction: column;
+    gap: 0.125rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  .filters__status { flex-basis: 100%; font-size: 0.8125rem; color: var(--ink-muted); }
+  .filters__status:empty { display: none; }
+
+  input[type="text"], input[type="search"], input[type="date"], select, textarea {
+    width: 100%;
+    min-height: 2.25rem;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--ink-muted);
+    background: var(--page);
+    font-weight: 400;
+  }
+
+  /* ==========================================================================
+     Board and columns
+     ========================================================================== */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+    align-items: start;
+  }
+
+  .column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-height: 16rem;
+    padding: var(--space-2);
+    border: 3px double var(--line-soft);
+    background: var(--surface);
+  }
+
+  /* Drop target: dashed yellow border plus a tint, so it is not colour alone */
+  .column.is-drop-target {
+    border: 3px dashed var(--accent);
+    background: var(--raised);
+  }
+
+  .column__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
+    background: var(--bar);
+    color: var(--bar-ink);
+    --accent: #0b1d63;
+  }
+
+  .column__heading { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+  .column__title { font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .column__badge { flex: none; font-size: 0.8125rem; font-weight: 700; }
+
+  .chip-svg { flex: none; display: block; width: 0.75rem; height: 0.75rem; }
+
+  .column__hint { font-size: 0.8125rem; color: var(--ink-muted); }
+  .column__cards { display: flex; flex-direction: column; gap: var(--space-2); }
+
+  .column__empty {
+    padding: var(--space-4) var(--space-2);
+    border: 1px dashed var(--ink-muted);
+    color: var(--ink-muted);
+    font-size: 0.8125rem;
+    text-align: center;
+  }
+
+  /* ==========================================================================
+     Task cards
+     ========================================================================== */
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--line-soft);
+    border-left: 6px solid var(--low);
+    background: var(--raised);
+    box-shadow: 3px 3px 0 var(--shadow);
+    cursor: grab;
+    overflow-wrap: anywhere;
+  }
+  .card.is-dragging { opacity: 0.5; }
+
+  .card--critical { border-left-color: #ff6f61; }
+  .card--high { border-left-color: var(--high); }
+  .card--medium { border-left-color: var(--medium); }
+  .card--low { border-left-color: var(--low); }
+
+  .card__top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .card__id { font-size: 0.8125rem; color: var(--line); }
+  .card__title { font-size: 0.9375rem; font-weight: 700; line-height: 1.3; }
+
+  .card__desc {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--ink-muted);
+    font-size: 0.8125rem;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .card__meta {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0 var(--space-2);
+    font-size: 0.8125rem;
+  }
+  .card__meta dt { color: var(--ink-muted); }
+
+  .card__progress {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+  .card__stepper { display: flex; gap: var(--space-1); }
+
+  .card__tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+
+  .pill, .tag, .badge-overdue {
+    display: inline-block;
+    padding: 0 var(--space-2);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+  .pill, .badge-overdue { font-weight: 700; white-space: nowrap; }
+
+  .pill--critical { background: var(--critical); color: #ffffff; }
+  .pill--high { background: var(--high); color: var(--accent-ink); }
+  .pill--medium { background: var(--medium); color: var(--accent-ink); }
+  .pill--low { background: var(--low); color: var(--accent-ink); }
+
+  .tag { border: 1px solid var(--line-soft); color: var(--ink-muted); }
+
+  .badge-overdue {
+    margin-left: var(--space-1);
+    background: var(--critical);
+    color: #ffffff;
+  }
+
+  .card__actions { display: flex; justify-content: flex-end; }
+
+  .card-btn {
+    min-height: 1.75rem;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--ink-muted);
+    background: var(--surface);
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+  .card-btn:hover { background: var(--line-soft); }
+
+  .card-btn--square { min-width: 1.75rem; padding: 0; }
+
+  .card-btn--icon {
+    min-width: 1.75rem;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--ink-muted);
+    font-size: 1.125rem;
+    line-height: 1;
+  }
+  .card-btn--icon:hover { background: var(--critical); color: #ffffff; }
+
+  .card-btn--danger { border-color: var(--bad); background: var(--critical); color: #ffffff; }
+  .card-btn--danger:hover { background: #8c1d17; }
+
+  .card__confirm {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  .card__move-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    padding-top: var(--space-2);
+    border-top: 1px dashed var(--ink-muted);
+  }
+  .card__move-panel .card-btn { flex: 1 1 auto; }
+
+  /* ==========================================================================
+     Add Task modal
+     ========================================================================== */
+  .task-dialog {
+    width: min(38rem, calc(100vw - 2rem));
+    padding: 0;
+    border: 3px double var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 8px 8px 0 var(--shadow);
+  }
+  .task-dialog::backdrop { background: rgba(2, 8, 35, 0.7); }
+
+  .task-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .task-form__title {
+    grid-column: 1 / -1;
+    padding: 0 var(--space-2);
+    background: var(--bar);
+    color: var(--bar-ink);
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+  }
+
+  .task-form__note { grid-column: 1 / -1; font-size: 0.8125rem; color: var(--ink-muted); }
+
+  .field { display: flex; flex-direction: column; gap: var(--space-1); }
+  .field--wide { grid-column: 1 / -1; }
+  .field label { font-size: 0.8125rem; font-weight: 700; }
+  .field textarea { min-height: 5rem; resize: vertical; }
+  .field [aria-invalid="true"] { border: 2px solid var(--bad); }
+
+  .required-mark { color: var(--warn); font-weight: 400; }
+
+  .field__error { color: var(--bad); font-size: 0.8125rem; }
+  .field__error:empty { display: none; }
+  .task-form > .field__error { grid-column: 1 / -1; }
+
+  .task-form__actions {
+    display: flex;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  /* ==========================================================================
+     Toasts and footer
+     ========================================================================== */
+  .toast-region {
+    position: fixed;
+    right: var(--space-4);
+    bottom: var(--space-4);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: min(24rem, calc(100vw - 2rem));
+    pointer-events: none;
+  }
+
+  .toast {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--bar-ink);
+    border-left: 6px solid var(--status-done);
+    background: var(--bar);
+    color: var(--bar-ink);
+    box-shadow: 4px 4px 0 var(--shadow);
+    font-size: 0.875rem;
+  }
+  .toast--warning { border-left-color: var(--critical); }
+
+  .statusbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-1) var(--space-4);
+    background: var(--bar);
+    color: var(--bar-ink);
+    font-size: 0.8125rem;
+    --accent: #0b1d63;
+  }
+  .statusbar a { color: var(--bar-ink); font-weight: 700; }
+  .statusbar a:hover { color: var(--raised); }
+
+  .framed-note { max-width: 40rem; margin: var(--space-5) auto; padding: var(--space-4); border: 3px double var(--line); }
+
+  /* ==========================================================================
+     Responsive and user-preference adjustments
+     ========================================================================== */
+  @media (max-width: 1320px) {
+    .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* Four narrow columns: stack card details so words are not split mid-way */
+  @media (min-width: 768px) and (max-width: 1100px) {
+    .board { gap: var(--space-2); }
+    .card { padding: var(--space-2); }
+    .card__meta { grid-template-columns: minmax(0, 1fr); }
+    .card__meta dd { margin-bottom: var(--space-1); }
+  }
+
+  @media (max-width: 767.98px) {
+    .menubar, .page, .statusbar { padding-left: var(--space-3); padding-right: var(--space-3); }
+    .charts { grid-template-columns: minmax(0, 1fr); }
+    .board { grid-template-columns: minmax(0, 1fr); }
+    .column { min-height: 0; }
+    .task-form { grid-template-columns: minmax(0, 1fr); padding: var(--space-3); }
+  }
+
+  /* Larger hit areas on touch screens, where Move ▸ replaces drag and drop */
+  @media (pointer: coarse) {
+    .card-btn, .card-btn--square, .card-btn--icon { min-height: 2.75rem; min-width: 2.75rem; }
+    .btn { min-height: 2.75rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wordmark__cursor { animation: none; }
+    .btn:active { transform: none; }
+  }
+
+  @media (prefers-contrast: more) {
+    body::after { display: none; }
+  }
+
+  @media print {
+    body::after { display: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#board-heading">Skip to the board</a>
+
+<!-- ======================= Menu bar and live summary strip ======================= -->
+<header class="menubar">
+  <h1 class="wordmark">IT PMO<span class="wordmark__cursor" aria-hidden="true">&#9608;</span> <span class="wordmark__version">Kanban v2</span></h1>
+  <ul class="summary" id="summary" aria-label="Board summary"></ul>
+  <button type="button" class="btn btn--primary" id="open-add-task">+ Add Task</button>
+</header>
+
+<main class="page">
+  <noscript><p class="demo-note">This board needs JavaScript to run.</p></noscript>
+
+  <!-- In-memory reset note. The second sentence only appears when opened from disk. -->
+  <p class="demo-note">
+    Demo data only: the board is held in memory, so refreshing the page resets it to the sample tasks.
+    <span id="file-note" hidden>Email notifications need this page to be opened from a web server, not as a local file.</span>
+  </p>
+
+  <!-- ======================= Project dashboard (rendered from state) ======================= -->
+  <details class="dash" id="dashboard" open>
+    <summary><h2 class="dash__title">Project dashboard</h2></summary>
+    <p class="dash__scope">Charts always count every task. Select a project to filter the board below. <a href="#board-heading">Jump to the board</a></p>
+    <div class="charts" id="charts"></div>
+  </details>
+
+  <!-- ======================= Filter bar ======================= -->
+  <section class="filters" aria-label="Filter tasks">
+    <div class="filters__field">
+      <label for="filter-project">Project</label>
+      <select id="filter-project"></select>
+    </div>
+    <div class="filters__field">
+      <label for="filter-assignee">Assignee contains</label>
+      <input type="search" id="filter-assignee" maxlength="60" autocomplete="off">
+    </div>
+    <div class="filters__field">
+      <label for="filter-priority">Priority</label>
+      <select id="filter-priority"></select>
+    </div>
+    <button type="button" class="btn" id="clear-filters">Clear filters</button>
+    <p class="filters__status" id="filter-status" aria-live="polite"></p>
+  </section>
+
+  <!-- ======================= Kanban board (rendered from state) ======================= -->
+  <h2 class="sr-only" id="board-heading" tabindex="-1">Kanban board</h2>
+  <div class="board" id="board"></div>
+</main>
+
+<footer class="statusbar">
+  <span>Sample data. Nothing is stored after you leave this page.</span>
+  <a href="../index.html">Open the previous version (v1)</a>
+</footer>
+
+<!-- Hover detail for chart marks. Every value is also in visible text or a data table. -->
+<div class="chart-tip" id="chart-tip" aria-hidden="true" hidden></div>
+
+<!-- Announces changes that have no toast, such as a progress step. -->
+<div class="sr-only" id="sr-status" aria-live="polite"></div>
+
+<!-- ======================= Add Task modal ======================= -->
+<dialog class="task-dialog" id="task-dialog" aria-labelledby="task-dialog-title">
+  <form class="task-form" id="task-form" novalidate autocomplete="off">
+    <h2 class="task-form__title" id="task-dialog-title">Add task</h2>
+    <p class="task-form__note">Use sample data only, never real customer or staff details. When email is set up, new tasks are sent through FormSubmit, a third-party service.</p>
+
+    <div class="field field--wide">
+      <label for="task-title">Task Title <span class="required-mark">(required)</span></label>
+      <input type="text" id="task-title" name="title" maxlength="80" aria-describedby="error-title">
+      <p class="field__error" id="error-title"></p>
+    </div>
+
+    <div class="field field--wide">
+      <label for="task-description">Description</label>
+      <textarea id="task-description" name="description" maxlength="500" aria-describedby="error-description"></textarea>
+      <p class="field__error" id="error-description"></p>
+    </div>
+
+    <div class="field">
+      <label for="task-project">Project / Workstream</label>
+      <select id="task-project" name="project"></select>
+    </div>
+
+    <div class="field">
+      <label for="task-category">Category</label>
+      <select id="task-category" name="category"></select>
+    </div>
+
+    <div class="field">
+      <label for="task-assignee">Assignee <span class="required-mark">(required)</span></label>
+      <input type="text" id="task-assignee" name="assignee" maxlength="60" aria-describedby="error-assignee">
+      <p class="field__error" id="error-assignee"></p>
+    </div>
+
+    <div class="field">
+      <label for="task-priority">Priority</label>
+      <select id="task-priority" name="priority"></select>
+    </div>
+
+    <div class="field">
+      <label for="task-due">Due Date <span class="required-mark">(required)</span></label>
+      <input type="date" id="task-due" name="dueDate" aria-describedby="error-dueDate">
+      <p class="field__error" id="error-dueDate"></p>
+    </div>
+
+    <div class="field">
+      <label for="task-status">Status</label>
+      <select id="task-status" name="status"></select>
+    </div>
+
+    <p class="field__error" id="error-form" role="alert"></p>
+
+    <div class="task-form__actions">
+      <button type="button" class="btn" id="cancel-add-task">Close</button>
+      <button type="submit" class="btn btn--primary" id="submit-task">Add Task</button>
+    </div>
+  </form>
+
+  <!-- A modal dialog makes the rest of the page inert, so toasts raised while it is open live here. -->
+  <div class="toast-region" id="dialog-toast-region" aria-live="polite"></div>
+</dialog>
+
+<!-- ======================= Toast region ======================= -->
+<div class="toast-region" id="toast-region" aria-live="polite"></div>
+
+<!--
+  FormSubmit setup: FORMSUBMIT_ENDPOINT, at the top of the script below, holds the destination address.
+  FormSubmit requires a one-time activation: the first submission triggers a confirmation email to that
+  address, and submissions only deliver after the link in it is clicked.
+  FormSubmit also rejects pages opened as local files, so email only works when this page is served over
+  http(s). The board itself works either way.
+-->
+<script>
+"use strict";
+
+/* ============================================================================
+   CONFIG: change the email address here, and only here. This file is public,
+   so use the random alias FormSubmit issues on activation, not a real address.
+   ============================================================================ */
+const FORMSUBMIT_ENDPOINT = "https://formsubmit.co/ajax/YOUR_EMAIL@example.com";
+const FORMSUBMIT_PLACEHOLDER = "YOUR_EMAIL@example.com";
+const FORMSUBMIT_TIMEOUT_MS = 15000;
+const NOTIFY_MAX_PER_MINUTE = 5;
+
+const TASK_ID_PREFIX = "UOB-ITPM";
+const EMAIL_SUBJECT_TAG = "[UOB IT PMO]";
+
+/* ============================================================================
+   Fixed lists
+   ============================================================================ */
+const COLUMNS = [
+  { status: "Backlog", hint: "Logged, not yet scheduled", key: "backlog" },
+  { status: "In Progress", hint: "Actively being worked", key: "progress" },
+  { status: "Blocked", hint: "Waiting on a dependency, vendor or approval", key: "blocked" },
+  { status: "Done", hint: "Completed / closed", key: "done" },
+];
+const STATUSES = COLUMNS.map((column) => column.status);
+const PROJECTS = [
+  "Core Banking Upgrade",
+  "Digital Channels",
+  "Cybersecurity Uplift",
+  "Data & Analytics",
+  "Infrastructure & Cloud",
+  "Vendor Management",
+];
+const CATEGORIES = [
+  "Application Development",
+  "Infrastructure",
+  "Cybersecurity",
+  "Data",
+  "Compliance",
+  "Vendor",
+];
+const PRIORITIES = ["Critical", "High", "Medium", "Low"];
+const PRIORITY_CLASS = { Critical: "critical", High: "high", Medium: "medium", Low: "low" };
+
+const FIELD_LIMITS = { title: 80, description: 500, assignee: 60 };
+const PROGRESS_STEP = 10;
+const PROGRESS_MAX_OPEN = 90; // Only Done is 100%, so a card can't look finished in another column.
+const TREND_WEEKS = 8;
+
+/* ============================================================================
+   State: the single source of truth. In memory only; a refresh resets it.
+   `ui` holds transient per-card modes so they also re-render from state.
+   ============================================================================ */
+const state = {
+  tasks: [],
+  filters: { project: "", assignee: "", priority: "" },
+  ui: {
+    confirmDeleteId: null,
+    moveOpenId: null,
+    draggingId: null,
+    sending: false,
+    autoCloseOnSend: false,
+    trendTableOpen: false,
+  },
+  notifySentAt: [],
+  nextTaskNumber: 1,
+};
+
+/* ============================================================================
+   Helpers
+   ============================================================================ */
+const elements = {
+  board: document.getElementById("board"),
+  charts: document.getElementById("charts"),
+  chartTip: document.getElementById("chart-tip"),
+  srStatus: document.getElementById("sr-status"),
+  summary: document.getElementById("summary"),
+  filterStatus: document.getElementById("filter-status"),
+  filterProject: document.getElementById("filter-project"),
+  filterAssignee: document.getElementById("filter-assignee"),
+  filterPriority: document.getElementById("filter-priority"),
+  clearFilters: document.getElementById("clear-filters"),
+  dialog: document.getElementById("task-dialog"),
+  form: document.getElementById("task-form"),
+  formError: document.getElementById("error-form"),
+  dueDate: document.getElementById("task-due"),
+  submit: document.getElementById("submit-task"),
+  openDialog: document.getElementById("open-add-task"),
+  closeDialog: document.getElementById("cancel-add-task"),
+  toasts: document.getElementById("toast-region"),
+  dialogToasts: document.getElementById("dialog-toast-region"),
+  fileNote: document.getElementById("file-note"),
+};
+
+/* The security policy requires Trusted Types, so setHtml() is the only way HTML can
+   enter the page. Any other innerHTML assignment throws. Callers must escape user
+   text with escapeHtml() first. */
+const htmlPolicy = window.trustedTypes
+  ? window.trustedTypes.createPolicy("board-html", { createHTML: (html) => html })
+  : { createHTML: (html) => html };
+
+function setHtml(element, html) {
+  element.innerHTML = htmlPolicy.createHTML(html);
+}
+
+/** Escapes a string for safe use in HTML text and quoted attributes. */
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/* Control and text-direction characters can inject email headers or disguise text. */
+const UNSAFE_CHARS = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u200B-\u200F\u2028\u2029\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/g;
+
+function cleanLine(value) {
+  return String(value ?? "").replace(/\n/g, " ").replace(UNSAFE_CHARS, " ").replace(/ {2,}/g, " ").trim();
+}
+
+function cleanMultiline(value) {
+  return String(value ?? "").replace(/\r\n?/g, "\n").replace(UNSAFE_CHARS, " ").trim();
+}
+
+/** Formats a Date as YYYY-MM-DD in local time (toISOString would shift it to UTC). */
+function toIsoDate(date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function todayIso() {
+  return toIsoDate(new Date());
+}
+
+function daysFromToday(offset) {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  return toIsoDate(date);
+}
+
+function parseIsoDate(isoDate) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDate(isoDate) {
+  return parseIsoDate(isoDate).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** True only for a real calendar date in strict YYYY-MM-DD form. */
+function isValidIsoDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return toIsoDate(parseIsoDate(value)) === value;
+}
+
+function daysUntil(isoDate) {
+  return Math.round((parseIsoDate(isoDate) - parseIsoDate(todayIso())) / 86400000);
+}
+
+function isOverdue(task) {
+  return task.status !== "Done" && task.dueDate < todayIso();
+}
+
+function nextTaskId() {
+  const number = String(state.nextTaskNumber).padStart(4, "0");
+  state.nextTaskNumber += 1;
+  return `${TASK_ID_PREFIX}-${number}`;
+}
+
+function findTask(id) {
+  return state.tasks.find((task) => task.id === id);
+}
+
+function optionsHtml(values, selected) {
+  return values
+    .map((value) => {
+      const isSelected = value === selected ? " selected" : "";
+      return `<option value="${escapeHtml(value)}"${isSelected}>${escapeHtml(value)}</option>`;
+    })
+    .join("");
+}
+
+function countByStatus(tasks, status) {
+  return tasks.filter((task) => task.status === status).length;
+}
+
+function averageProgress(tasks) {
+  if (!tasks.length) return 0;
+  return Math.round(tasks.reduce((sum, task) => sum + task.progress, 0) / tasks.length);
+}
+
+/* ============================================================================
+   Filtering
+   ============================================================================ */
+
+/** Returns the tasks that match the current filters. */
+function applyFilters() {
+  const { project, assignee, priority } = state.filters;
+  const assigneeQuery = assignee.trim().toLowerCase();
+  return state.tasks.filter((task) => {
+    return (
+      (!project || task.project === project) &&
+      (!priority || task.priority === priority) &&
+      (!assigneeQuery || task.assignee.toLowerCase().includes(assigneeQuery))
+    );
+  });
+}
+
+function filtersActive() {
+  const { project, assignee, priority } = state.filters;
+  return Boolean(project || assignee.trim() || priority);
+}
+
+/* ============================================================================
+   Charts: inline SVG rebuilt from state. Geometry uses SVG attributes because
+   the security policy forbids style attributes. All numbers are ours, and every
+   user-supplied string still goes through escapeHtml().
+   ============================================================================ */
+
+function segmentBar(percent) {
+  const cells = 20;
+  const lit = Math.round((percent / 100) * cells);
+  let rects = "";
+  for (let i = 0; i < cells; i += 1) {
+    rects += `<rect x="${i * 10}" width="8" height="10" class="${i < lit ? "seg__on" : "seg__off"}"/>`;
+  }
+  return `<svg class="seg" viewBox="0 0 200 10" preserveAspectRatio="none" aria-hidden="true" focusable="false">${rects}</svg>`;
+}
+
+function statusChip(key) {
+  return `<svg class="chip-svg" viewBox="0 0 10 10" aria-hidden="true" focusable="false"><rect width="10" height="10" class="fill-${key}"/></svg>`;
+}
+
+/** Health is stated as icon plus label, so it never relies on colour alone. */
+function projectHealth(tasks) {
+  if (!tasks.length) return { label: "No tasks", icon: "-", className: "none" };
+  if (tasks.every((task) => task.status === "Done")) return { label: "Complete", icon: "✓", className: "good" };
+  const overdue = tasks.filter(isOverdue);
+  if (overdue.some((task) => task.priority === "Critical" || task.status === "Blocked")) {
+    return { label: "Off track", icon: "✗", className: "bad" };
+  }
+  if (overdue.length || countByStatus(tasks, "Blocked")) {
+    return { label: "At risk", icon: "!", className: "warn" };
+  }
+  return { label: "On track", icon: "✓", className: "good" };
+}
+
+function renderProjectsPanel() {
+  const all = state.tasks;
+  const percent = averageProgress(all);
+  const done = countByStatus(all, "Done");
+
+  const rows = PROJECTS.map((project, index) => {
+    const tasks = all.filter((task) => task.project === project);
+    const projectPercent = averageProgress(tasks);
+    const health = projectHealth(tasks);
+    const details = [`${countByStatus(tasks, "Done")}/${tasks.length} done`];
+    const blocked = countByStatus(tasks, "Blocked");
+    const overdue = tasks.filter(isOverdue).length;
+    if (blocked) details.push(`${blocked} blocked`);
+    if (overdue) details.push(`${overdue} overdue`);
+    const isActive = state.filters.project === project;
+
+    return `<button type="button" class="proj" data-project-index="${index}" aria-pressed="${isActive}">
+      <span class="proj__name">${escapeHtml(project)}</span>
+      ${segmentBar(projectPercent)}
+      <span class="proj__pct">${projectPercent}%</span>
+      <span class="proj__health health--${health.className}">${health.icon} ${health.label}</span>
+      <span class="proj__meta">${details.join(" &middot; ")}</span>
+    </button>`;
+  }).join("");
+
+  return `<section class="panel" aria-labelledby="panel-projects">
+    <h3 class="panel__title" id="panel-projects">Project progress</h3>
+    <div class="portfolio">
+      <p class="portfolio__line">
+        <span class="portfolio__pct">${percent}%</span>
+        <span class="panel__note">Portfolio average &middot; ${done} of ${all.length} tasks done</span>
+      </p>
+      ${segmentBar(percent)}
+    </div>
+    <div class="projects">${rows}</div>
+  </section>`;
+}
+
+function renderStatusPanel() {
+  const total = state.tasks.length;
+  const radius = 58;
+  const circumference = 2 * Math.PI * radius;
+  const gap = total > 1 ? 2 : 0;
+  let travelled = 0;
+
+  const arcs = COLUMNS.map((column) => {
+    const count = countByStatus(state.tasks, column.status);
+    if (!count) return "";
+    const length = (count / total) * circumference;
+    const visible = Math.max(length - gap, 1);
+    const arc = `<circle class="ring ring-${column.key}" cx="80" cy="80" r="${radius}"
+      stroke-dasharray="${visible.toFixed(2)} ${(circumference - visible).toFixed(2)}"
+      stroke-dashoffset="${(-travelled).toFixed(2)}" transform="rotate(-90 80 80)" shape-rendering="crispEdges"
+      data-tip="${escapeHtml(column.status)}: ${count} of ${total} tasks"/>`;
+    travelled += length;
+    return arc;
+  }).join("");
+
+  const legend = COLUMNS.map((column) => {
+    const count = countByStatus(state.tasks, column.status);
+    const share = total ? Math.round((count / total) * 100) : 0;
+    return `<li class="legend__row">${statusChip(column.key)}
+      <span class="legend__name">${escapeHtml(column.status)}</span>
+      <span class="legend__value">${count} (${share}%)</span></li>`;
+  }).join("");
+
+  const summary = COLUMNS.map((column) => `${column.status} ${countByStatus(state.tasks, column.status)}`).join(", ");
+
+  return `<section class="panel" aria-labelledby="panel-status">
+    <h3 class="panel__title" id="panel-status">Tasks by status</h3>
+    <svg class="chart chart--ring" viewBox="0 0 160 160" role="img" aria-label="Donut chart of ${total} tasks. ${escapeHtml(summary)}.">
+      ${total ? "" : `<circle class="ring ring-empty" cx="80" cy="80" r="${radius}"/>`}
+      ${arcs}
+      <text x="80" y="82" text-anchor="middle" class="chart__big">${total}</text>
+      <text x="80" y="100" text-anchor="middle" class="chart__muted">tasks</text>
+    </svg>
+    <ul class="legend">${legend}</ul>
+  </section>`;
+}
+
+function dueBuckets() {
+  const buckets = [
+    { label: "Late", detail: "Overdue", test: (days) => days < 0, overdue: true, count: 0 },
+    { label: "0-7d", detail: "Due in 0 to 7 days", test: (days) => days >= 0 && days <= 7, count: 0 },
+    { label: "8-14d", detail: "Due in 8 to 14 days", test: (days) => days >= 8 && days <= 14, count: 0 },
+    { label: "15-30d", detail: "Due in 15 to 30 days", test: (days) => days >= 15 && days <= 30, count: 0 },
+    { label: "31d+", detail: "Due in more than 30 days", test: (days) => days > 30, count: 0 },
+  ];
+  state.tasks
+    .filter((task) => task.status !== "Done")
+    .forEach((task) => {
+      const days = daysUntil(task.dueDate);
+      const bucket = buckets.find((candidate) => candidate.test(days));
+      bucket.count += 1;
+    });
+  return buckets;
+}
+
+/** Column of stacked blocks, one block per task, so counts can be read directly. */
+function renderDuePanel() {
+  const buckets = dueBuckets();
+  const width = 320;
+  const height = 200;
+  const baseline = height - 22;
+  const plotHeight = baseline - 22;
+  const slot = width / buckets.length;
+  const barWidth = slot - 16;
+  const tallest = Math.max(4, ...buckets.map((bucket) => bucket.count));
+  const blockHeight = plotHeight / tallest;
+
+  const bars = buckets.map((bucket, index) => {
+    const x = index * slot + 8;
+    let blocks = "";
+    for (let i = 0; i < bucket.count; i += 1) {
+      const y = baseline - (i + 1) * blockHeight;
+      blocks += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${Math.max(blockHeight - 2, 1).toFixed(1)}" class="${bucket.overdue ? "fill-overdue" : "fill-due"}"/>`;
+    }
+    const labelX = (x + barWidth / 2).toFixed(1);
+    const valueY = (baseline - bucket.count * blockHeight - 5).toFixed(1);
+    const tip = `${bucket.detail}: ${bucket.count} open ${bucket.count === 1 ? "task" : "tasks"}`;
+    return `${blocks}
+      <text x="${labelX}" y="${valueY}" text-anchor="middle">${bucket.count}</text>
+      <text x="${labelX}" y="${baseline + 16}" text-anchor="middle" class="chart__muted">${bucket.label}</text>
+      <rect class="chart__hit" x="${(index * slot).toFixed(1)}" y="0" width="${slot.toFixed(1)}" height="${height}" data-tip="${tip}"/>`;
+  }).join("");
+
+  const summary = buckets.map((bucket) => `${bucket.detail} ${bucket.count}`).join(", ");
+  return `<section class="panel" aria-labelledby="panel-due">
+    <h3 class="panel__title" id="panel-due">Open tasks by due date</h3>
+    <svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Column chart of open tasks. ${summary}.">
+      <line class="chart__axis" x1="0" x2="${width}" y1="${baseline}" y2="${baseline}"/>
+      ${bars}
+    </svg>
+    <p class="panel__note">One block is one task. Late means past its due date.</p>
+  </section>`;
+}
+
+function trendPoints() {
+  const points = [];
+  for (let week = TREND_WEEKS; week >= 0; week -= 1) {
+    const date = daysFromToday(-7 * week);
+    points.push({
+      date,
+      label: week === 0 ? "Now" : `-${week}w`,
+      scope: state.tasks.filter((task) => task.createdOn <= date).length,
+      done: state.tasks.filter((task) => task.completedOn && task.completedOn <= date).length,
+    });
+  }
+  return points;
+}
+
+/** Stepped lines, because both series are cumulative counts that move in whole tasks. */
+function steppedPath(points, valueOf, xOf, yOf) {
+  return points
+    .map((point, index) => {
+      const x = xOf(index).toFixed(1);
+      const y = yOf(valueOf(point)).toFixed(1);
+      if (index === 0) return `M${x} ${y}`;
+      return `H${x} V${y}`;
+    })
+    .join(" ");
+}
+
+function renderTrendPanel() {
+  const points = trendPoints();
+  const width = 320;
+  const height = 200;
+  const left = 28;
+  const right = 76;
+  const top = 10;
+  const baseline = height - 22;
+  const last = points[points.length - 1];
+  const maxValue = Math.max(4, last.scope, ...points.map((point) => point.scope));
+  const yMax = Math.ceil(maxValue / 4) * 4;
+  const step = (width - left - right) / (points.length - 1);
+  const xOf = (index) => left + index * step;
+  const yOf = (value) => baseline - (value / yMax) * (baseline - top);
+
+  const grid = [0, yMax / 2, yMax].map((value) => {
+    const y = yOf(value).toFixed(1);
+    return `<line class="${value === 0 ? "chart__axis" : "chart__grid"}" x1="${left}" x2="${width - right}" y1="${y}" y2="${y}"/>
+      <text x="${left - 5}" y="${(yOf(value) + 4).toFixed(1)}" text-anchor="end" class="chart__muted">${value}</text>`;
+  }).join("");
+
+  const xLabels = points
+    .map((point, index) => (index % 4 === 0
+      ? `<text x="${xOf(index).toFixed(1)}" y="${baseline + 16}" text-anchor="middle" class="chart__muted">${point.label}</text>`
+      : ""))
+    .join("");
+
+  const hits = points.map((point, index) => {
+    const tip = `${formatDate(point.date)}: ${point.done} done of ${point.scope} in scope`;
+    return `<rect class="chart__hit" x="${(xOf(index) - step / 2).toFixed(1)}" y="${top}" width="${step.toFixed(1)}" height="${baseline - top}" data-tip="${tip}"/>`;
+  }).join("");
+
+  const rows = points
+    .map((point) => `<tr><td>${formatDate(point.date)}</td><td>${point.scope}</td><td>${point.done}</td></tr>`)
+    .join("");
+
+  // Direct labels sit at the line ends, nudged apart when the two values are close.
+  let scopeY = yOf(last.scope) + 4;
+  let doneY = yOf(last.done) + 4;
+  if (Math.abs(scopeY - doneY) < 14) {
+    scopeY -= 7;
+    doneY += 7;
+  }
+
+  return `<section class="panel" aria-labelledby="panel-trend">
+    <h3 class="panel__title" id="panel-trend">Burn-up, last ${TREND_WEEKS} weeks</h3>
+    <svg class="chart" viewBox="0 0 ${width} ${height}" role="img"
+      aria-label="Burn-up chart. Now ${last.done} tasks done of ${last.scope} in scope. Weekly values are in the data table.">
+      ${grid}
+      <path class="line-scope" d="${steppedPath(points, (point) => point.scope, xOf, yOf)}"/>
+      <path class="line-done" d="${steppedPath(points, (point) => point.done, xOf, yOf)}"/>
+      <text x="${width - right + 5}" y="${scopeY.toFixed(1)}">${last.scope} scope</text>
+      <text x="${width - right + 5}" y="${doneY.toFixed(1)}">${last.done} done</text>
+      ${xLabels}
+      ${hits}
+    </svg>
+    <details class="data-table"${state.ui.trendTableOpen ? " open" : ""}>
+      <summary>Show weekly data</summary>
+      <table>
+        <thead><tr><th scope="col">Week ending</th><th scope="col">Scope</th><th scope="col">Done</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </details>
+  </section>`;
+}
+
+function renderCharts() {
+  hideChartTip();
+  setHtml(
+    elements.charts,
+    renderProjectsPanel() + renderStatusPanel() + renderDuePanel() + renderTrendPanel(),
+  );
+}
+
+function showChartTip(target, event) {
+  const tip = elements.chartTip;
+  tip.textContent = target.dataset.tip;
+  tip.hidden = false;
+  const margin = 12;
+  const left = Math.min(event.clientX + margin, window.innerWidth - tip.offsetWidth - margin);
+  const top = Math.max(event.clientY - tip.offsetHeight - margin, margin);
+  tip.style.left = `${Math.max(left, margin)}px`;
+  tip.style.top = `${top}px`;
+}
+
+function hideChartTip() {
+  elements.chartTip.hidden = true;
+}
+
+function handleChartsPointerMove(event) {
+  const target = event.target.closest("[data-tip]");
+  if (target) showChartTip(target, event);
+  else hideChartTip();
+}
+
+/* Selecting a project row filters the board; selecting it again clears that filter. */
+function handleChartsClick(event) {
+  const button = event.target.closest("[data-project-index]");
+  if (!button) return;
+  const index = Number(button.dataset.projectIndex);
+  const project = PROJECTS[index];
+  elements.filterProject.value = state.filters.project === project ? "" : project;
+  state.ui.moveOpenId = null;
+  state.ui.confirmDeleteId = null;
+  handleFilterChange();
+  elements.charts.querySelector(`[data-project-index="${index}"]`).focus();
+}
+
+function handleChartsToggle(event) {
+  if (event.target.classList.contains("data-table")) state.ui.trendTableOpen = event.target.open;
+}
+
+/* ============================================================================
+   Rendering: everything on the board is rebuilt from state
+   ============================================================================ */
+
+function renderSummary() {
+  const items = [{ label: "Total", value: state.tasks.length }];
+  STATUSES.forEach((status) => {
+    items.push({ label: status, value: countByStatus(state.tasks, status) });
+  });
+  const overdue = state.tasks.filter(isOverdue).length;
+  items.push({ label: "Overdue", value: overdue, alert: overdue > 0 });
+
+  setHtml(
+    elements.summary,
+    items
+      .map((item) => {
+        const alertClass = item.alert ? " summary__item--alert" : "";
+        return `<li class="summary__item${alertClass}">
+          <span class="summary__value">${item.value}</span> ${escapeHtml(item.label)}
+        </li>`;
+      })
+      .join(""),
+  );
+}
+
+function renderDeleteControl(task) {
+  const id = escapeHtml(task.id);
+  if (state.ui.confirmDeleteId === task.id) {
+    return `<div class="card__confirm" role="group" aria-label="Confirm delete of ${id}">
+      <span>Delete?</span>
+      <button type="button" class="card-btn card-btn--danger" data-action="delete-yes">Yes</button>
+      <button type="button" class="card-btn" data-action="delete-no">No</button>
+    </div>`;
+  }
+  return `<button type="button" class="card-btn card-btn--icon" data-action="delete-ask"
+    aria-label="Delete ${id}">&times;</button>`;
+}
+
+function renderMovePanel(task) {
+  if (state.ui.moveOpenId !== task.id) return "";
+  const buttons = STATUSES.filter((status) => status !== task.status)
+    .map((status) => {
+      const label = escapeHtml(status);
+      return `<button type="button" class="card-btn" data-action="move-to" data-status="${label}">${label}</button>`;
+    })
+    .join("");
+  return `<div class="card__move-panel" role="group" aria-label="Move ${escapeHtml(task.id)} to column">${buttons}</div>`;
+}
+
+/* Only work in flight can be stepped: Backlog is always 0% and Done always 100%. */
+function renderProgress(task) {
+  const id = escapeHtml(task.id);
+  const canStep = task.status === "In Progress" || task.status === "Blocked";
+  const stepper = canStep
+    ? `<span class="card__stepper">
+        <button type="button" class="card-btn card-btn--square" data-action="progress-down" aria-label="Decrease progress of ${id}">&minus;</button>
+        <button type="button" class="card-btn card-btn--square" data-action="progress-up" aria-label="Increase progress of ${id}">+</button>
+      </span>`
+    : "";
+  return `<div class="card__progress">
+    ${segmentBar(task.progress)}
+    <span><span class="sr-only">Progress </span>${task.progress}%</span>
+    ${stepper}
+  </div>`;
+}
+
+function renderCard(task) {
+  const id = escapeHtml(task.id);
+  const priorityClass = PRIORITY_CLASS[task.priority] || "low";
+  const isMoveOpen = state.ui.moveOpenId === task.id;
+  const description = task.description
+    ? `<p class="card__desc">${escapeHtml(task.description)}</p>`
+    : "";
+  const overdueBadge = isOverdue(task) ? '<span class="badge-overdue">! Overdue</span>' : "";
+
+  return `<article class="card card--${priorityClass}" draggable="true" data-id="${id}" aria-labelledby="title-${id}">
+    <div class="card__top">
+      <span class="card__id">${id}</span>
+      ${renderDeleteControl(task)}
+    </div>
+    <h3 class="card__title" id="title-${id}">${escapeHtml(task.title)}</h3>
+    ${description}
+    <dl class="card__meta">
+      <dt>Project</dt><dd>${escapeHtml(task.project)}</dd>
+      <dt>Assignee</dt><dd>${escapeHtml(task.assignee)}</dd>
+      <dt>Due</dt><dd>${escapeHtml(formatDate(task.dueDate))}${overdueBadge}</dd>
+    </dl>
+    ${renderProgress(task)}
+    <div class="card__tags">
+      <span class="pill pill--${priorityClass}">${escapeHtml(task.priority)}</span>
+      <span class="tag">${escapeHtml(task.category)}</span>
+    </div>
+    <div class="card__actions">
+      <button type="button" class="card-btn" data-action="move-toggle"
+        aria-expanded="${isMoveOpen}" aria-label="Move ${id} to another column">Move &#9656;</button>
+    </div>
+    ${renderMovePanel(task)}
+  </article>`;
+}
+
+function renderColumn(column, visibleTasks) {
+  const status = escapeHtml(column.status);
+  const headingId = `column-${column.status.toLowerCase().replace(/\s+/g, "-")}`;
+  const cards = visibleTasks.filter((task) => task.status === column.status);
+  const total = countByStatus(state.tasks, column.status);
+  const badgeText = filtersActive() ? `${cards.length} of ${total}` : String(total);
+  const emptyText = filtersActive() ? "No tasks match the filters" : "No tasks";
+  const body = cards.length
+    ? cards.map(renderCard).join("")
+    : `<p class="column__empty">${emptyText}</p>`;
+
+  return `<section class="column" data-status="${status}" aria-labelledby="${headingId}">
+    <div class="column__header">
+      <div class="column__heading">
+        ${statusChip(column.key)}
+        <h2 class="column__title" id="${headingId}" tabindex="-1">${status}</h2>
+      </div>
+      <span class="column__badge" aria-label="${badgeText} tasks">${badgeText}</span>
+    </div>
+    <p class="column__hint">${escapeHtml(column.hint)}</p>
+    <div class="column__cards">${body}</div>
+  </section>`;
+}
+
+function renderBoard() {
+  const visibleTasks = applyFilters();
+  setHtml(elements.board, COLUMNS.map((column) => renderColumn(column, visibleTasks)).join(""));
+  elements.filterStatus.textContent = filtersActive()
+    ? `Showing ${visibleTasks.length} of ${state.tasks.length} tasks`
+    : "";
+  renderSummary();
+  renderCharts();
+}
+
+/* Re-rendering replaces the focused element, so keyboard actions put focus back explicitly. */
+function focusInCard(taskId, selector) {
+  const card = elements.board.querySelector(`.card[data-id="${taskId}"]`);
+  const target = card && card.querySelector(selector);
+  if (target) target.focus();
+}
+
+function focusColumnHeading(status) {
+  const column = elements.board.querySelector(`.column[data-status="${status}"]`);
+  if (column) column.querySelector(".column__title").focus();
+}
+
+/* ============================================================================
+   Task actions
+   ============================================================================ */
+
+/** A task's status decides what it may report: Backlog is 0%, Done is 100%. */
+function progressForStatus(status, currentProgress) {
+  if (status === "Backlog") return 0;
+  if (status === "Done") return 100;
+  return Math.min(currentProgress, PROGRESS_MAX_OPEN);
+}
+
+function addTask(values) {
+  const task = {
+    id: nextTaskId(),
+    ...values,
+    progress: progressForStatus(values.status, 0),
+    createdOn: todayIso(),
+    completedOn: values.status === "Done" ? todayIso() : null,
+  };
+  state.tasks.push(task);
+  renderBoard();
+  return task;
+}
+
+function moveTask(id, status) {
+  const task = findTask(id);
+  if (!task || !STATUSES.includes(status) || task.status === status) return false;
+  task.status = status;
+  task.progress = progressForStatus(status, task.progress);
+  task.completedOn = status === "Done" ? todayIso() : null;
+  state.ui.moveOpenId = null;
+  state.ui.confirmDeleteId = null;
+  renderBoard();
+  return true;
+}
+
+function deleteTask(id) {
+  state.tasks = state.tasks.filter((task) => task.id !== id);
+  state.ui.confirmDeleteId = null;
+  state.ui.moveOpenId = null;
+  renderBoard();
+}
+
+function stepProgress(id, delta) {
+  const task = findTask(id);
+  if (delta > 0 && task.progress >= PROGRESS_MAX_OPEN) {
+    showToast("Move the card to Done to reach 100%");
+    return;
+  }
+  task.progress = Math.max(0, Math.min(PROGRESS_MAX_OPEN, task.progress + delta));
+  renderBoard();
+  elements.srStatus.textContent = `${task.id} progress ${task.progress}%`;
+}
+
+/* ============================================================================
+   Toasts
+   ============================================================================ */
+
+function showToast(message, type = "success") {
+  const toast = document.createElement("div");
+  toast.className = `toast toast--${type}`;
+  toast.textContent = message;
+  (elements.dialog.open ? elements.dialogToasts : elements.toasts).appendChild(toast);
+  window.setTimeout(() => toast.remove(), type === "warning" ? 7000 : 4000);
+}
+
+/* ============================================================================
+   FormSubmit notification
+   ============================================================================ */
+
+/* A courtesy limit that stops this page flooding the mailbox. It cannot stop someone
+   posting to the endpoint directly: see SECURITY.md. */
+function takeNotifySlot() {
+  const now = Date.now();
+  state.notifySentAt = state.notifySentAt.filter((sentAt) => now - sentAt < 60000);
+  if (state.notifySentAt.length >= NOTIFY_MAX_PER_MINUTE) return false;
+  state.notifySentAt.push(now);
+  return true;
+}
+
+async function notifyNewTask(task) {
+  // Until the address is configured, fail locally rather than post demo data to a placeholder.
+  if (FORMSUBMIT_ENDPOINT.includes(FORMSUBMIT_PLACEHOLDER)) {
+    throw new Error("FormSubmit endpoint is not configured");
+  }
+  if (!takeNotifySlot()) throw new Error("Email notification limit reached");
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), FORMSUBMIT_TIMEOUT_MS);
+  try {
+    const res = await fetch(FORMSUBMIT_ENDPOINT, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      redirect: "error",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        _subject: `${EMAIL_SUBJECT_TAG} New task ${task.id}: ${task.title}`,
+        _template: "table",
+        _captcha: "false",
+        "Task ID": task.id,
+        Title: task.title,
+        Description: task.description,
+        Project: task.project,
+        Category: task.category,
+        Assignee: task.assignee,
+        Priority: task.priority,
+        "Due Date": task.dueDate,
+        Status: task.status,
+        "Submitted At": new Date().toISOString(),
+      }),
+    });
+    if (!res.ok) throw new Error(`FormSubmit failed: ${res.status}`);
+
+    // FormSubmit can report errors in the JSON body, so a 200 status alone is not success.
+    const data = await res.json();
+    if (data.success === false || data.success === "false") {
+      throw new Error("FormSubmit rejected the request");
+    }
+    return data;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+/* ============================================================================
+   Add Task form: validation and submit
+   ============================================================================ */
+
+function readFormValues() {
+  const data = new FormData(elements.form);
+  return {
+    title: cleanLine(data.get("title")),
+    description: cleanMultiline(data.get("description")),
+    project: String(data.get("project") ?? ""),
+    category: String(data.get("category") ?? ""),
+    assignee: cleanLine(data.get("assignee")),
+    priority: String(data.get("priority") ?? ""),
+    dueDate: String(data.get("dueDate") ?? ""),
+    status: String(data.get("status") ?? ""),
+  };
+}
+
+/** Returns a map of field name to error message; empty when the form is valid. */
+function validateTask(values) {
+  const errors = {};
+  if (!values.title) errors.title = "Enter a task title.";
+  else if (values.title.length > FIELD_LIMITS.title) errors.title = "Keep the title to 80 characters or fewer.";
+  if (values.description.length > FIELD_LIMITS.description) {
+    errors.description = "Keep the description to 500 characters or fewer.";
+  }
+  if (!values.assignee) errors.assignee = "Enter an assignee.";
+  else if (values.assignee.length > FIELD_LIMITS.assignee) errors.assignee = "Keep the assignee to 60 characters or fewer.";
+  if (!values.dueDate) errors.dueDate = "Choose a due date.";
+  else if (!isValidIsoDate(values.dueDate)) errors.dueDate = "Enter a real date with a four-digit year.";
+  else if (values.dueDate < todayIso()) errors.dueDate = "The due date cannot be in the past.";
+
+  // The lists come from this page, so a mismatch means the form was tampered with.
+  const listsValid =
+    PROJECTS.includes(values.project) &&
+    CATEGORIES.includes(values.category) &&
+    PRIORITIES.includes(values.priority) &&
+    STATUSES.includes(values.status);
+  if (!listsValid) errors.form = "Choose the project, category, priority and status from their lists.";
+  return errors;
+}
+
+function setFieldError(name, message) {
+  const field = elements.form.elements[name];
+  document.getElementById(`error-${name}`).textContent = message || "";
+  if (message) field.setAttribute("aria-invalid", "true");
+  else field.removeAttribute("aria-invalid");
+}
+
+function showFormErrors(errors) {
+  const validated = ["title", "description", "assignee", "dueDate"];
+  validated.forEach((name) => setFieldError(name, errors[name]));
+  elements.formError.textContent = errors.form || "";
+  const firstInvalid = validated.find((name) => errors[name]);
+  if (firstInvalid) elements.form.elements[firstInvalid].focus();
+}
+
+function setSending(isSending) {
+  state.ui.sending = isSending;
+  elements.submit.disabled = isSending;
+  elements.submit.textContent = isSending ? "Sending…" : "Add Task";
+}
+
+async function handleFormSubmit(event) {
+  event.preventDefault();
+  if (state.ui.sending) return;
+
+  const values = readFormValues();
+  const errors = validateTask(values);
+  showFormErrors(errors);
+  if (Object.keys(errors).length > 0) return;
+
+  // Optimistic UI: the card is on the board before the network call starts.
+  const task = addTask(values);
+  elements.form.reset();
+  const hiddenNote = applyFilters().includes(task) ? "" : " (hidden by the current filters)";
+  showToast(`Task ${task.id} added${hiddenNote}`);
+
+  setSending(true);
+  state.ui.autoCloseOnSend = true;
+  elements.form.elements.title.focus();
+
+  try {
+    await notifyNewTask(task);
+  } catch (error) {
+    // A notification failure must never affect the board.
+    console.warn("Email notification failed:", error.message);
+    showToast("Card added locally — email notification failed", "warning");
+  } finally {
+    setSending(false);
+    if (state.ui.autoCloseOnSend && elements.dialog.open) elements.dialog.close();
+  }
+}
+
+function openTaskDialog() {
+  elements.dueDate.min = todayIso();
+  elements.dialog.showModal();
+  elements.form.elements.title.focus();
+}
+
+function handleDialogClose() {
+  state.ui.autoCloseOnSend = false;
+  elements.form.reset();
+  showFormErrors({});
+  // Toasts inside the closed dialog would disappear, so move them to the page.
+  while (elements.dialogToasts.firstChild) {
+    elements.toasts.appendChild(elements.dialogToasts.firstChild);
+  }
+}
+
+/* ============================================================================
+   Board interactions: buttons and keyboard (delegated, so they survive re-renders)
+   ============================================================================ */
+
+function handleBoardClick(event) {
+  const button = event.target.closest("[data-action]");
+  if (!button) return;
+  const id = button.closest(".card").dataset.id;
+
+  switch (button.dataset.action) {
+    case "delete-ask":
+      state.ui.confirmDeleteId = id;
+      state.ui.moveOpenId = null;
+      renderBoard();
+      focusInCard(id, '[data-action="delete-no"]');
+      break;
+    case "delete-no":
+      state.ui.confirmDeleteId = null;
+      renderBoard();
+      focusInCard(id, '[data-action="delete-ask"]');
+      break;
+    case "delete-yes": {
+      const status = findTask(id).status;
+      deleteTask(id);
+      showToast(`Task ${id} deleted`);
+      focusColumnHeading(status);
+      break;
+    }
+    case "move-toggle": {
+      const opening = state.ui.moveOpenId !== id;
+      state.ui.moveOpenId = opening ? id : null;
+      state.ui.confirmDeleteId = null;
+      renderBoard();
+      focusInCard(id, opening ? '[data-action="move-to"]' : '[data-action="move-toggle"]');
+      break;
+    }
+    case "move-to":
+      if (moveTask(id, button.dataset.status)) {
+        showToast(`Task ${id} moved to ${button.dataset.status}`);
+      }
+      focusInCard(id, '[data-action="move-toggle"]');
+      break;
+    case "progress-up":
+      stepProgress(id, PROGRESS_STEP);
+      focusInCard(id, '[data-action="progress-up"]');
+      break;
+    case "progress-down":
+      stepProgress(id, -PROGRESS_STEP);
+      focusInCard(id, '[data-action="progress-down"]');
+      break;
+  }
+}
+
+/* Esc backs out of whichever inline control is open and returns focus to its opener. */
+function handleBoardKeydown(event) {
+  if (event.key !== "Escape") return;
+  const { moveOpenId, confirmDeleteId } = state.ui;
+  if (moveOpenId) {
+    state.ui.moveOpenId = null;
+    renderBoard();
+    focusInCard(moveOpenId, '[data-action="move-toggle"]');
+  } else if (confirmDeleteId) {
+    state.ui.confirmDeleteId = null;
+    renderBoard();
+    focusInCard(confirmDeleteId, '[data-action="delete-ask"]');
+  }
+}
+
+/* A click anywhere outside an open Move panel closes it. */
+function handleDocumentClick(event) {
+  if (state.ui.moveOpenId && !event.target.closest("[data-action]")) {
+    state.ui.moveOpenId = null;
+    renderBoard();
+  }
+}
+
+/* ============================================================================
+   Drag and drop (native HTML5 API)
+   ============================================================================ */
+
+function clearDropHighlights() {
+  elements.board
+    .querySelectorAll(".is-drop-target")
+    .forEach((column) => column.classList.remove("is-drop-target"));
+}
+
+function handleDragStart(event) {
+  const card = event.target.closest(".card");
+  if (!card) return;
+  state.ui.draggingId = card.dataset.id;
+  event.dataTransfer.setData("text/plain", card.dataset.id);
+  event.dataTransfer.effectAllowed = "move";
+  card.classList.add("is-dragging");
+}
+
+function handleDragOver(event) {
+  const column = event.target.closest(".column");
+  if (!column || !state.ui.draggingId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  if (!column.classList.contains("is-drop-target")) {
+    clearDropHighlights();
+    column.classList.add("is-drop-target");
+  }
+}
+
+function handleDragLeave(event) {
+  // Ignore moves between elements inside the board; only clear on leaving it entirely.
+  if (!elements.board.contains(event.relatedTarget)) clearDropHighlights();
+}
+
+function handleDrop(event) {
+  const column = event.target.closest(".column");
+  if (!column || !state.ui.draggingId) return;
+  event.preventDefault();
+  // Trust the card this page started dragging, never text dropped in from elsewhere.
+  const id = state.ui.draggingId;
+  const status = column.dataset.status;
+  state.ui.draggingId = null;
+  clearDropHighlights();
+  if (moveTask(id, status)) showToast(`Task ${id} moved to ${status}`);
+  else renderBoard();
+}
+
+function handleDragEnd() {
+  // Fires when a drag is cancelled too, so this is where all drag visuals are reset.
+  state.ui.draggingId = null;
+  clearDropHighlights();
+  const dragged = elements.board.querySelector(".is-dragging");
+  if (dragged) dragged.classList.remove("is-dragging");
+}
+
+/* ============================================================================
+   Filter bar events
+   ============================================================================ */
+
+function handleFilterChange() {
+  state.filters.project = elements.filterProject.value;
+  state.filters.assignee = elements.filterAssignee.value;
+  state.filters.priority = elements.filterPriority.value;
+  renderBoard();
+}
+
+function handleClearFilters() {
+  elements.filterProject.value = "";
+  elements.filterAssignee.value = "";
+  elements.filterPriority.value = "";
+  handleFilterChange();
+}
+
+/* ============================================================================
+   Seed data: dates are relative to today, so the overdue state and the burn-up
+   chart always show. All tasks, people and projects are fictitious.
+   ============================================================================ */
+
+function seedTasks() {
+  // [title, description, project, category, assignee, priority, status, due, created, completed, progress]
+  const seeds = [
+    ["Migrate FX pricing service to AWS", "Lift the FX pricing microservice from the on-premises cluster to the new AWS landing zone.", "Infrastructure & Cloud", "Infrastructure", "Daniel Koh", "High", "Backlog", 21, -18, null, 0],
+    ["Define retention rules for the customer data lake", "Agree retention periods per data class with Compliance and Data Governance.", "Data & Analytics", "Data", "Aisha Rahman", "Medium", "Backlog", 30, -12, null, 0],
+    ["Dress rehearsal 2 for the core banking cutover", "Run the full weekend cutover plan against the rehearsal environment.", "Core Banking Upgrade", "Application Development", "Marcus Lim", "Critical", "Backlog", 28, -6, null, 0],
+    ["Assess the security posture of the new SMS gateway vendor", "Complete the third-party risk questionnaire and review the penetration test summary.", "Vendor Management", "Vendor", "Hui Min Goh", "Medium", "Backlog", 44, -3, null, 0],
+    ["Patch CVE-2025-XXXX on branch teller VDI", "Roll out the vendor hotfix to all branch teller virtual desktops after pilot sign-off.", "Cybersecurity Uplift", "Cybersecurity", "Wei Ling Tan", "Critical", "In Progress", -2, -16, null, 80],
+    ["Build payment limits API for core banking cutover", "Expose daily transfer limits through the new core banking service layer.", "Core Banking Upgrade", "Application Development", "Marcus Lim", "High", "In Progress", 9, -38, null, 60],
+    ["Add passkey login to the retail app", "Offer passkeys alongside the existing device binding for retail customers.", "Digital Channels", "Application Development", "Priya Nair", "High", "In Progress", 16, -24, null, 40],
+    ["Tune SIEM alerts for payment fraud", "Reduce false positives on the high-value transfer detection rules.", "Cybersecurity Uplift", "Cybersecurity", "Wei Ling Tan", "Medium", "In Progress", 12, -20, null, 30],
+    ["Automate the regulatory returns pipeline", "Replace the manual spreadsheet step with a scheduled, audited data pipeline.", "Data & Analytics", "Compliance", "Aisha Rahman", "High", "In Progress", 40, -32, null, 50],
+    ["Expand disaster recovery site storage", "Add capacity for the additional replicated workloads before year end.", "Infrastructure & Cloud", "Infrastructure", "Daniel Koh", "Medium", "In Progress", 5, -14, null, 20],
+    ["UAT sign-off for mobile onboarding release 4.2", "Waiting on business sign-off for the remaining eKYC test scenarios.", "Digital Channels", "Application Development", "Priya Nair", "High", "Blocked", -5, -35, null, 70],
+    ["Renew card switch vendor support contract", "Pending procurement approval of revised SLA terms from the vendor.", "Vendor Management", "Vendor", "Hui Min Goh", "Medium", "Blocked", 6, -27, null, 50],
+    ["Quarterly privileged access review", "Completed review of administrator entitlements across production systems.", "Cybersecurity Uplift", "Compliance", "Wei Ling Tan", "Medium", "Done", -10, -40, -11, 100],
+    ["Decommission legacy SFTP gateway", "All partner file transfers now run on the managed gateway.", "Infrastructure & Cloud", "Infrastructure", "Daniel Koh", "Low", "Done", -14, -52, -15, 100],
+    ["Reconcile GL balances in cutover rehearsal 1", "General ledger balances matched after the first rehearsal.", "Core Banking Upgrade", "Application Development", "Marcus Lim", "High", "Done", -12, -50, -13, 100],
+    ["Freeze interface specifications for teller channels", "Teller channel interfaces signed off and placed under change control.", "Core Banking Upgrade", "Application Development", "Marcus Lim", "Medium", "Done", -28, -56, -30, 100],
+    ["Publish accessibility fixes for internet banking", "Contrast and keyboard fixes released in the October patch.", "Digital Channels", "Application Development", "Priya Nair", "Medium", "Done", -6, -44, -7, 100],
+    ["Profile data quality for the customer master", "Baseline completeness and duplicate rates recorded for each source system.", "Data & Analytics", "Data", "Aisha Rahman", "Low", "Done", -20, -48, -22, 100],
+  ];
+  state.tasks = seeds.map(([title, description, project, category, assignee, priority, status, due, created, completed, progress]) => ({
+    id: nextTaskId(),
+    title,
+    description,
+    project,
+    category,
+    assignee,
+    priority,
+    status,
+    dueDate: daysFromToday(due),
+    createdOn: daysFromToday(created),
+    completedOn: completed === null ? null : daysFromToday(completed),
+    progress,
+  }));
+}
+
+/* ============================================================================
+   Startup
+   ============================================================================ */
+
+function populateSelects() {
+  const allOption = (label) => `<option value="">${label}</option>`;
+  setHtml(elements.filterProject, allOption("All projects") + optionsHtml(PROJECTS));
+  setHtml(elements.filterPriority, allOption("All priorities") + optionsHtml(PRIORITIES));
+  setHtml(elements.form.elements.project, optionsHtml(PROJECTS));
+  setHtml(elements.form.elements.category, optionsHtml(CATEGORIES));
+  setHtml(elements.form.elements.priority, optionsHtml(PRIORITIES, "Medium"));
+  setHtml(elements.form.elements.status, optionsHtml(STATUSES, "Backlog"));
+}
+
+function bindEvents() {
+  elements.board.addEventListener("click", handleBoardClick);
+  elements.board.addEventListener("keydown", handleBoardKeydown);
+  document.addEventListener("click", handleDocumentClick);
+
+  elements.charts.addEventListener("click", handleChartsClick);
+  elements.charts.addEventListener("pointermove", handleChartsPointerMove);
+  elements.charts.addEventListener("pointerleave", hideChartTip);
+  elements.charts.addEventListener("toggle", handleChartsToggle, true);
+
+  elements.board.addEventListener("dragstart", handleDragStart);
+  elements.board.addEventListener("dragover", handleDragOver);
+  elements.board.addEventListener("dragleave", handleDragLeave);
+  elements.board.addEventListener("drop", handleDrop);
+  elements.board.addEventListener("dragend", handleDragEnd);
+
+  elements.filterProject.addEventListener("change", handleFilterChange);
+  elements.filterPriority.addEventListener("change", handleFilterChange);
+  elements.filterAssignee.addEventListener("input", handleFilterChange);
+  elements.clearFilters.addEventListener("click", handleClearFilters);
+
+  elements.openDialog.addEventListener("click", openTaskDialog);
+  elements.closeDialog.addEventListener("click", () => elements.dialog.close());
+  elements.dialog.addEventListener("close", handleDialogClose);
+  elements.form.addEventListener("submit", handleFormSubmit);
+  elements.form.addEventListener("input", (event) => {
+    // Someone typing during a send is adding another task, so keep the dialog open for them.
+    state.ui.autoCloseOnSend = false;
+    if (document.getElementById(`error-${event.target.name}`)) setFieldError(event.target.name, "");
+  });
+}
+
+/* GitHub Pages cannot send frame-ancestors or X-Frame-Options, so the page refuses
+   to run inside another site's frame, which blocks clickjacking of its controls. */
+function isFramed() {
+  try {
+    return window.top !== window.self;
+  } catch {
+    return true;
+  }
+}
+
+function refuseFraming() {
+  const note = document.createElement("p");
+  note.className = "framed-note";
+  note.textContent = "For security, this board can't run inside another page. Open it in its own tab.";
+  document.body.replaceChildren(note);
+}
+
+function init() {
+  if (isFramed()) {
+    refuseFraming();
+    return;
+  }
+  elements.fileNote.hidden = window.location.protocol !== "file:";
+  populateSelects();
+  seedTasks();
+  bindEvents();
+  renderBoard();
+}
+
+init();
+</script>
+</body>
+</html>

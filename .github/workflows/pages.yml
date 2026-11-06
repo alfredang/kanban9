@@ -9,17 +9,21 @@ on:
 permissions:
   contents: read
 
+# Actions are pinned to full commit SHAs, so a moved tag can't change what runs here.
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - name: Check the entry page exists
-        run: test -f index.html
+          persist-credentials: false
+      - name: Check v1 is unchanged
+        run: echo "bea2f16c3cc6c041bbfdc9ca2057cc9e8787e3f81223552830e24cd4350b8aac  index.html" | sha256sum -c -
+      - name: Check the v2 security policy and project rules
+        run: python3 .github/scripts/check_site.py
       - name: Scan for secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -38,10 +42,18 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          path: .
+          persist-credentials: false
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      # Publish only the two pages, not the repository's docs and project files.
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/v2
+          cp index.html _site/index.html
+          cp v2/index.html _site/v2/index.html
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

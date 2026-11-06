@@ -4,11 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-An IT project management Kanban board for a fictitious bank's IT PMO, used for demos and training. All of the app is in `index.html`: markup, CSS and JS, with no other source files.
+An IT project management Kanban board for a fictitious bank's IT PMO, used for demos and training. Each version is a single HTML file of markup, CSS and JS.
+
+- **`v2/index.html`** is the current version, published at `/kanban9/v2/`. Make all changes here. The sections below describe it unless they say otherwise.
+- **Root `index.html`** is v1, published at `/kanban9/`. It is frozen: CI pins its checksum, so don't edit it.
+
+See `v2-only rules` below before editing v2, because a stale security hash stops the page loading.
 
 ## Commands
 
-There is no build step, package manifest, linter or test suite.
+There is no build step, package manifest or test suite.
+
+- **Update the security hashes:** run `python .github/scripts/check_site.py --write` after any edit to v2's style or script block. Without `--write`, it checks the hashes and project rules, as CI does.
 
 - **Run the board:** open `index.html` directly (double-click). It must keep working this way.
 - **Test email sending:** serve the folder over http(s), for example `python -m http.server`, then open `http://localhost:8000`. FormSubmit rejects pages opened from `file://`, so a local-file page always ends in the warning toast.
@@ -19,8 +26,19 @@ There is no build step, package manifest, linter or test suite.
 - Vanilla HTML, CSS and JS only: no frameworks, build tools or external resources (fonts, CDNs, images). Use system fonts and Unicode or inline SVG icons.
 - No storage of any kind: no `localStorage`, `sessionStorage`, `indexedDB` or cookies. A refresh resets the board, and the page says so.
 - FormSubmit is the only backend. The destination email address may go nowhere except `FORMSUBMIT_ENDPOINT`.
-- The branding is a neutral "IT PMO" text wordmark on a corporate blue palette. Do not use UOB's logo or trademarks, or imitate an official UOB system. "UOB" appears only in `TASK_ID_PREFIX` and `EMAIL_SUBJECT_TAG`, because the brief specifies those formats.
+- The branding is a neutral "IT PMO" text wordmark on a corporate blue palette. v2 expresses this as a blue-screen terminal look with system monospace fonts. Do not use UOB's logo or trademarks, or imitate an official UOB system. "UOB" appears only in `TASK_ID_PREFIX` and `EMAIL_SUBJECT_TAG`, because the brief specifies those formats.
 - No `alert()`, `confirm()` or `!important`. Validation errors and the delete confirmation are inline.
+
+## v2-only rules
+
+The security policy in the page's meta tag shapes how v2 can be written. `SECURITY.md` has the threat model.
+
+- Inline style and script run only if their hashes match, so don't name those tags in HTML comments: the hash script matches on them.
+- Insert HTML only with `setHtml()`. Trusted Types make any other `innerHTML` assignment throw.
+- `style` attributes and inline event handlers are blocked. Size chart marks with SVG attributes, or set `element.style` from JS.
+- To test email, serve a copy with a fake `FORMSUBMIT_ENDPOINT` and re-stamped hashes, and intercept `https://formsubmit.co/**` in the browser. With the placeholder address, the page never calls `fetch`.
+- Chart colours follow status and were checked for colour-blind separation against `--surface`, so re-validate if you change either.
+- Charts count all tasks, like the summary strip. Task progress follows status: Backlog is 0%, only Done is 100%.
 
 ## Architecture
 
