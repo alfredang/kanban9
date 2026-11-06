@@ -1,0 +1,21 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+id_rsa*
+.npmrc
+.netrc
+
+# Local tooling output
+.claude/settings.local.json
+.playwright-mcp/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
